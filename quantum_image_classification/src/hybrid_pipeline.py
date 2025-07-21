@@ -1,36 +1,48 @@
+# src/hybrid_pipeline.py
 import numpy as np
-from data.datasets import MNISTDataHandler
-from src.preprocessing.image_preprocessing import normalize_images
-from src.quantum_processing.brqi_encoding import create_brqi_circuit
-from src.quantum_processing.feature_extraction import extract_features
-from src.classical_classification.traditional_models import *
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.exceptions import NotFittedError
 
 class HybridPipeline:
-    def __init__(self):
-        self.data_handler = MNISTDataHandler()
+    def __init__(self, n_components=4, use_pca=True):
+        self.use_pca = use_pca
+        self.n_components = n_components
+        self.pca = None  # Don't instantiate here
+        self.scaler = StandardScaler()
         
-    def run(self, sample_size=100):
-        # Load data
-        X_train, y_train, X_test, y_test = self.data_handler.get_numpy_data()
+    def run(self, X_train, y_train, X_test, y_test):
+        # Preprocess training data first
+        X_train = self._preprocess(X_train, fit_pca=True)
         
-        # Process subset
-        X_train = normalize_images(X_train[:sample_size])
-        X_test = normalize_images(X_test[:sample_size])
+        # Preprocess test data with fitted PCA
+        X_test = self._preprocess(X_test, fit_pca=False)
         
-        # Quantum feature extraction
-        train_features = [self.process_image(img) for img in X_train]
-        test_features = [self.process_image(img) for img in X_test]
+        # Rest of the pipeline remains the same
+        X_train_q = self.qcnn.extract_features(X_train)
+        X_test_q = self.qcnn.extract_features(X_test)
         
-        # Classical training
-        svm = train_svm(train_features, y_train[:sample_size])
-        rf = train_random_forest(train_features, y_train[:sample_size])
+        model = Pipeline([
+            ('scaler', self.scaler),
+            ('svm', SVC(kernel='rbf', C=10, gamma='scale'))
+        ])
         
-        # Evaluation
-        return {
-            'SVM': svm.score(test_features, y_test[:sample_size]),
-            'RandomForest': rf.score(test_features, y_test[:sample_size])
-        }
-    
-    def process_image(self, img):
-        circuit = create_brqi_circuit(img.reshape(28, 28))
-        return extract_features(circuit)[:32]  # Use first 32 features
+        model.fit(X_train_q, y_train)
+        return model.score(X_test_q, y_test)
+
+    def _preprocess(self, images, fit_pca=False):
+        """Handle PCA fitting/transforming properly"""
+        if self.use_pca:
+            if fit_pca or self.pca is None:
+                # Initialize and fit PCA on training data
+                self.pca = PCA(self.n_components)
+                return self.pca.fit_transform(images)
+            else:
+                # Transform using already fitted PCA
+                try:
+                    return self.pca.transform(images)
+                except NotFittedError:
+                    raise RuntimeError("PCA used before fitting. Call _preprocess with fit_pca=True first")
+        return images

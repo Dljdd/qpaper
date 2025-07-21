@@ -1,0 +1,30 @@
+// Workflow Diagram
+digraph {
+	A [label="Input: MNIST Images"]
+	B1 [label="Downsampling
+(16×16 / 8×8)"]
+	B2 [label="PCA / Autoencoder
+Compression"]
+	C [label="BRQI Encoding
+(Bit-Plane Quantum Encoding)"]
+	D1 [label="QCNN
+(Quantum ConvNet)"]
+	D2 [label="PQC
+(Hardware-Efficient Ansatz)"]
+	E1 [label="Pauli-Basis
+(X, Y, Z)"]
+	E2 [label="Classical Shadows
+Tomography"]
+	F [label="Classical Classifier
+(SVM / RF)"]
+	A -> B1
+	A -> B2
+	B1 -> C
+	B2 -> C
+	C -> D1
+	C -> D2
+	D1 -> E1
+	D2 -> E2
+	E1 -> F
+	E2 -> F
+}
